@@ -68,6 +68,12 @@ curl -fsSL https://raw.githubusercontent.com/stevio2d/ai-chat-shell/main/install
   --auto-exec
 ```
 
+Single-line install with API key, model, and alias:
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/stevio2d/ai-chat-shell/main/install.sh | OPENROUTER_API_KEY="sk-or-..." bash -s -- --model "google/gemini-2.5-flash-lite" --alias "ai"
+```
+
 Query-style input:
 
 ```bash
