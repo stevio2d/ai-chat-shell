@@ -136,6 +136,10 @@ class AichatTests(TestCase):
         )
         self.assertIn("contains secret-like token", issues)
 
+    def test_validate_command_output_rejects_short_openrouter_style_token(self):
+        issues = aichat.validate_command_output('echo "sk-or-v1-132abc"')
+        self.assertIn("contains secret-like token", issues)
+
     def test_validate_command_output_allows_placeholder_api_key_assignment(self):
         issues = aichat.validate_command_output(
             'OPENROUTER_API_KEY="your_openrouter_api_key_here" ./run-local-tests.sh'

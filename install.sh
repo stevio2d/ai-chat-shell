@@ -352,7 +352,13 @@ fi
   echo '    last_cmd=$(tail -n 1 "$last_cmd_file" 2>/dev/null | sed "s/^[[:space:]]*//; s/[[:space:]]*$//")'
   echo '  fi'
   echo '  if [[ -z "$last_cmd" ]]; then'
-  echo "    last_cmd=\$(fc -ln -20 2>/dev/null | sed '/^[[:space:]]*$/d' | sed '/^[[:space:]]*\\(${ALIAS_NAME}\\|${ALIAS_NAME}c\\|${FIX_ALIAS_NAME}\\|aifix\\|__aichat_fix\\)\\>/d' | tail -n 1 | sed 's/^[[:space:]]*//')"
+  echo "    last_cmd=\$(fc -ln -20 2>/dev/null | sed '/^[[:space:]]*$/d' | sed '/^[[:space:]]*\\(${FIX_ALIAS_NAME}\\|aifix\\|__aichat_fix\\)\\>/d' | tail -n 1 | sed 's/^[[:space:]]*//')"
+  echo "    if [[ \"\$last_cmd\" == \"${ALIAS_NAME} \"* ]]; then"
+  echo "      last_cmd=\${last_cmd#${ALIAS_NAME} }"
+  echo "    fi"
+  echo "    if [[ \"\$last_cmd\" == \"${ALIAS_NAME}c \"* ]]; then"
+  echo "      last_cmd=\${last_cmd#${ALIAS_NAME}c }"
+  echo "    fi"
   echo '  fi'
   echo '  if [[ -z "$last_cmd" ]]; then'
   echo "    echo \"${FIX_ALIAS_NAME}: no previous shell command found in history.\" >&2"
@@ -371,9 +377,11 @@ fi
   echo '  if [[ -n "$note" ]]; then'
   echo '    prompt+="My note: $note\n"'
   echo '  fi'
-  echo '  prompt+="Return exactly one corrected zsh command for macOS/Linux.\n"'
-  echo '  prompt+="Keep the same primary tool/intent as the last command unless my note explicitly asks to change it.\n"'
-  echo '  prompt+="Do not output installers, setup/bootstrap commands, or any API keys/secrets."'
+  echo '  prompt+="Return exactly one corrected zsh command for macOS/Linux on a single line.\n"'
+  echo '  prompt+="Edit the provided command with minimal changes; do not invent an unrelated workflow.\n"'
+  echo '  prompt+="Keep the same leading executable unless my note explicitly asks to change it.\n"'
+  echo '  prompt+="If my note asks to replace one value with another and that value exists, apply that literal replacement.\n"'
+  echo '  prompt+="Do not output installers, setup/bootstrap commands, curl|bash patterns, API-key assignments, or any secrets."'
   echo ''
   echo "  \"\$HOME/.local/bin/${ALIAS_NAME}c\" --exec \"\$prompt\""
   echo '}'

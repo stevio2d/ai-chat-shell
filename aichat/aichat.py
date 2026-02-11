@@ -46,7 +46,7 @@ RISK_PATTERNS = (
     (r"(?:^|[;&|])\s*:\(\)\s*\{", "fork-bomb-pattern", "high"),
     (r">\s*/(etc|usr|bin|sbin|var)\b", "system-file-write", "high"),
 )
-SECRET_PATTERNS = (r"sk-or-v1-[A-Za-z0-9]{20,}",)
+SECRET_PATTERNS = (r"sk-or-v1-[A-Za-z0-9]{6,}",)
 SECRET_ASSIGNMENT_PATTERNS = (
     r"\bOPENROUTER_API_KEY\s*=\s*['\"]?([A-Za-z0-9._-]{12,})",
     r"\bAI_API_KEY\s*=\s*['\"]?([A-Za-z0-9._-]{12,})",
