@@ -85,6 +85,8 @@ Notes:
 
 - Use `--from-query` when you want URL-style parameters.
 - `api_key=` query parameters are intentionally ignored by the installer; use `OPENROUTER_API_KEY` instead.
+- Installed launchers source `~/.config/ai-chat-shell/env` on each run.
+- If your shell already defines `ai` as an alias, use `command ai ...` or reopen the shell after install.
 
 ### Option 3: Run from source
 

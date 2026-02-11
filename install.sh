@@ -183,6 +183,10 @@ fi
 cat > "${BIN_DIR}/${ALIAS_NAME}" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ -f "${ENV_FILE}" ]]; then
+  # shellcheck disable=SC1090
+  source "${ENV_FILE}"
+fi
 exec python3 "${INSTALL_DIR}/aichat.py" ${RUN_FLAGS[*]} "\$@"
 EOF
 chmod +x "${BIN_DIR}/${ALIAS_NAME}"
@@ -190,6 +194,10 @@ chmod +x "${BIN_DIR}/${ALIAS_NAME}"
 cat > "${BIN_DIR}/${ALIAS_NAME}c" <<EOF
 #!/usr/bin/env bash
 set -euo pipefail
+if [[ -f "${ENV_FILE}" ]]; then
+  # shellcheck disable=SC1090
+  source "${ENV_FILE}"
+fi
 exec python3 "${INSTALL_DIR}/aichat.py" -c "\$@"
 EOF
 chmod +x "${BIN_DIR}/${ALIAS_NAME}c"
@@ -201,17 +209,27 @@ if [[ ! -f "${SHELL_RC}" ]]; then
   touch "${SHELL_RC}"
 fi
 
-if ! grep -Fq "${START_MARK}" "${SHELL_RC}"; then
-  {
-    echo
-    echo "${START_MARK}"
-    echo 'export PATH="$HOME/.local/bin:$PATH"'
-    echo 'if [ -f "$HOME/.config/ai-chat-shell/env" ]; then'
-    echo '  source "$HOME/.config/ai-chat-shell/env"'
-    echo 'fi'
-    echo "${END_MARK}"
-  } >> "${SHELL_RC}"
+if grep -Fq "${START_MARK}" "${SHELL_RC}"; then
+  TMP_RC="$(mktemp)"
+  awk -v start="${START_MARK}" -v end="${END_MARK}" '
+    $0 == start { in_block = 1; next }
+    $0 == end { in_block = 0; next }
+    !in_block { print }
+  ' "${SHELL_RC}" > "${TMP_RC}"
+  mv "${TMP_RC}" "${SHELL_RC}"
 fi
+
+{
+  echo
+  echo "${START_MARK}"
+  echo 'export PATH="$HOME/.local/bin:$PATH"'
+  echo 'if [ -f "$HOME/.config/ai-chat-shell/env" ]; then'
+  echo '  source "$HOME/.config/ai-chat-shell/env"'
+  echo 'fi'
+  echo "unalias ${ALIAS_NAME} 2>/dev/null || true"
+  echo "unalias ${ALIAS_NAME}c 2>/dev/null || true"
+  echo "${END_MARK}"
+} >> "${SHELL_RC}"
 
 echo "Installed:"
 echo "  ${BIN_DIR}/${ALIAS_NAME}      # smart mode (chat or command)"
