@@ -136,6 +136,12 @@ class AichatTests(TestCase):
         )
         self.assertIn("contains secret-like token", issues)
 
+    def test_validate_command_output_allows_placeholder_api_key_assignment(self):
+        issues = aichat.validate_command_output(
+            'OPENROUTER_API_KEY="your_openrouter_api_key_here" ./run-local-tests.sh'
+        )
+        self.assertNotIn("contains secret-like token", issues)
+
     def test_persist_last_command_writes_configured_file(self):
         with TemporaryDirectory() as temp_dir:
             command_file = Path(temp_dir) / "state" / "last_command"
