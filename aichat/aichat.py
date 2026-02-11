@@ -28,7 +28,8 @@ DEFAULT_CHAT_SYSTEM_PROMPT = (
 DEFAULT_COMMAND_SYSTEM_PROMPT = (
     "Return exactly one shell command for macOS/Linux zsh. "
     "If the task has multiple steps, combine them into a single one-liner command. "
-    "No markdown, no explanations, no code fences."
+    "No markdown, no explanations, no code fences. "
+    "Do not use placeholders like <file> or <container_name_or_id>."
 )
 DEFAULT_CLASSIFIER_SYSTEM_PROMPT = (
     "Classify the user request for a terminal assistant. "
@@ -65,6 +66,36 @@ SECRET_PLACEHOLDER_MARKERS = (
     "sample",
     "test",
 )
+PLACEHOLDER_TOKEN_MARKERS = {
+    "name",
+    "id",
+    "path",
+    "file",
+    "dir",
+    "directory",
+    "url",
+    "uri",
+    "token",
+    "key",
+    "secret",
+    "container",
+    "image",
+    "tag",
+    "branch",
+    "commit",
+    "repo",
+    "project",
+    "service",
+    "namespace",
+    "pod",
+    "user",
+    "password",
+    "pattern",
+    "query",
+    "value",
+    "port",
+    "host",
+}
 
 
 def env_float(name):
@@ -369,6 +400,24 @@ def is_secret_like_assignment_value(value):
     return bool(re.search(r"[A-Za-z]", candidate) and re.search(r"\d", candidate))
 
 
+def contains_placeholder_token(command):
+    for match in re.finditer(r"<([^<>\n]+)>", command):
+        inner = match.group(1).strip()
+        if not inner:
+            continue
+        normalized = re.sub(r"[_-]+", " ", inner.lower()).strip()
+        tokens = re.findall(r"[a-z0-9]+", normalized)
+        if not tokens:
+            continue
+        if " or " in normalized:
+            return True
+        if normalized.startswith(("your ", "enter ", "replace ")):
+            return True
+        if any(token in PLACEHOLDER_TOKEN_MARKERS for token in tokens):
+            return True
+    return False
+
+
 def validate_command_output(command):
     issues = []
     if not command:
@@ -380,6 +429,8 @@ def validate_command_output(command):
     lowered = command.lower()
     if lowered.startswith(("run ", "use ", "here is ", "this command ", "you can ")):
         issues.append("contains explanatory text")
+    if contains_placeholder_token(command):
+        issues.append("contains placeholder token")
     for pattern in SECRET_PATTERNS:
         if re.search(pattern, command):
             issues.append("contains secret-like token")
@@ -418,6 +469,11 @@ def enforce_command_quality(args, model, messages, output):
             repair_request += (
                 " Do not include API keys, token-like strings, or OPENROUTER_API_KEY/AI_API_KEY "
                 "assignments."
+            )
+        if "contains placeholder token" in issues:
+            repair_request += (
+                " Replace placeholders with concrete values or shell expressions and do not use "
+                "angle-bracket placeholders like <name>."
             )
         if expected_primary:
             repair_request += (

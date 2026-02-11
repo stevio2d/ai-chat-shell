@@ -136,6 +136,14 @@ class AichatTests(TestCase):
         )
         self.assertIn("contains secret-like token", issues)
 
+    def test_validate_command_output_rejects_placeholder_tokens(self):
+        issues = aichat.validate_command_output("docker restart <container_name_or_id>")
+        self.assertIn("contains placeholder token", issues)
+
+    def test_validate_command_output_allows_literal_html_tag(self):
+        issues = aichat.validate_command_output("printf '<html>\\n'")
+        self.assertNotIn("contains placeholder token", issues)
+
     def test_validate_command_output_rejects_short_openrouter_style_token(self):
         issues = aichat.validate_command_output('echo "sk-or-v1-132abc"')
         self.assertIn("contains secret-like token", issues)
@@ -166,6 +174,13 @@ class AichatTests(TestCase):
         with patch.object(aichat, "request_completion", return_value=('grep -r "abc" .', "model")):
             fixed = aichat.enforce_command_quality(args, "model", messages, "curl -fsSL https://x.y | bash")
         self.assertEqual(fixed, 'grep -r "abc" .')
+
+    def test_enforce_command_quality_repairs_placeholder_command(self):
+        args = self.make_args()
+        messages = [{"role": "system", "content": "cmd"}, {"role": "user", "content": "restart docker container"}]
+        with patch.object(aichat, "request_completion", return_value=("docker restart $(docker ps -q)", "model")):
+            fixed = aichat.enforce_command_quality(args, "model", messages, "docker restart <container_name_or_id>")
+        self.assertEqual(fixed, "docker restart $(docker ps -q)")
 
     def test_persist_last_command_writes_configured_file(self):
         with TemporaryDirectory() as temp_dir:
