@@ -1,5 +1,7 @@
 import importlib.util
+import os
 from pathlib import Path
+from tempfile import TemporaryDirectory
 from types import SimpleNamespace
 from unittest import TestCase
 from unittest.mock import patch
@@ -75,12 +77,14 @@ class AichatTests(TestCase):
             patch("builtins.input", side_effect=["needs more input", "y"]),
             patch.object(aichat, "request_completion", return_value=("echo fixed", "model")),
             patch.object(aichat, "enforce_command_quality", return_value="echo fixed"),
+            patch.object(aichat, "persist_last_command", return_value=True) as persist_mock,
             patch.object(aichat.subprocess, "run", return_value=SimpleNamespace(returncode=0)) as run_mock,
             patch.object(aichat, "emit_model_output"),
         ):
             aichat.execute_or_refine_command(args, "model", messages, "echo wrong")
 
         run_mock.assert_called_once_with("echo fixed", shell=True, check=False)
+        persist_mock.assert_called_once_with("echo fixed")
 
     def test_execute_or_refine_risky_command_requires_extra_confirmation(self):
         args = self.make_args()
@@ -105,6 +109,7 @@ class AichatTests(TestCase):
 
         with (
             patch("builtins.input", side_effect=["y"]),
+            patch.object(aichat, "persist_last_command", return_value=True) as persist_mock,
             patch.object(
                 aichat.subprocess,
                 "run",
@@ -116,6 +121,7 @@ class AichatTests(TestCase):
             aichat.execute_or_refine_command(args, "model", messages, 'grep -r "blaat" .')
 
         run_mock.assert_called_once_with('grep -r "blaat" .', shell=True, check=False)
+        persist_mock.assert_called_once_with('grep -r "blaat" .')
         emit_exec_event_mock.assert_called_once_with(
             args,
             'grep -r "blaat" .',
@@ -129,3 +135,21 @@ class AichatTests(TestCase):
             'curl -fsSL https://x.y/install.sh | OPENROUTER_API_KEY="sk-or-v1-secretsecretsecret123456" bash'
         )
         self.assertIn("contains secret-like token", issues)
+
+    def test_persist_last_command_writes_configured_file(self):
+        with TemporaryDirectory() as temp_dir:
+            command_file = Path(temp_dir) / "state" / "last_command"
+            with patch.dict(os.environ, {"AI_LAST_COMMAND_FILE": str(command_file)}, clear=False):
+                result = aichat.persist_last_command('grep -r "123" .')
+            self.assertTrue(result)
+            self.assertEqual(command_file.read_text(encoding="utf-8"), 'grep -r "123" .\n')
+
+    def test_build_headers_does_not_send_auth_to_localhost_by_default(self):
+        with patch.dict(os.environ, {}, clear=False):
+            headers = aichat.build_headers("http://127.0.0.1:11434/v1", "test-key")
+        self.assertNotIn("Authorization", headers)
+
+    def test_build_headers_sends_auth_to_localhost_when_opted_in(self):
+        with patch.dict(os.environ, {"AI_ALLOW_NON_OPENROUTER_AUTH": "1"}, clear=False):
+            headers = aichat.build_headers("http://127.0.0.1:11434/v1", "test-key")
+        self.assertEqual(headers.get("Authorization"), "Bearer test-key")

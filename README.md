@@ -1,6 +1,6 @@
 # ai-chat-shell
 
-Minimal Python CLI for chatting with OpenRouter-compatible models from your terminal.
+Minimal Python CLI for chatting with OpenRouter-compatible APIs from your terminal (including local LM Studio/Ollama endpoints).
 
 ## Current functionality
 
@@ -10,6 +10,7 @@ Minimal Python CLI for chatting with OpenRouter-compatible models from your term
 - Optional one-shot command intent detection (`--auto-command`)
 - Optional command execution flow (`--exec`) with confirm/skip/refine loop
 - OpenRouter-compatible `/chat/completions` requests
+- Local provider presets in installer (`--ollama`, `--lmstudio`, `--provider`)
 - Built-in API key host safety checks
 - Structured JSON output for scripting (`--json`)
 - Retry/backoff with fallback model support
@@ -55,6 +56,7 @@ Default install creates:
 
 - `ai`: smart mode (starts with `--auto-command`)
 - `aic`: explicit command mode (`-c`)
+- `aifix`: fix helper for the previous command (name follows alias; e.g. `--alias abc` creates `abcfix`)
 
 Installer options:
 
@@ -66,6 +68,18 @@ curl -fsSL https://raw.githubusercontent.com/stevio2d/ai-chat-shell/main/install
   --ref "main" \
   --no-auto-command \
   --auto-exec
+
+# Local Ollama (no API key required by default)
+curl -fsSL https://raw.githubusercontent.com/stevio2d/ai-chat-shell/main/install.sh | bash -s -- \
+  --ollama \
+  --model "llama3.2" \
+  --alias "ai"
+
+# Local LM Studio (no API key required by default)
+curl -fsSL https://raw.githubusercontent.com/stevio2d/ai-chat-shell/main/install.sh | bash -s -- \
+  --lmstudio \
+  --model "local-model" \
+  --alias "ai"
 ```
 
 Single-line install with API key, model, and alias:
@@ -78,7 +92,7 @@ Query-style input:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/stevio2d/ai-chat-shell/main/install.sh | bash -s -- \
-  --from-query "model=google%2Fgemini-2.5-flash-lite&alias=ai&auto_exec=1"
+  --from-query "provider=ollama&model=llama3.2&alias=ai&auto_exec=1"
 ```
 
 Notes:
@@ -86,7 +100,7 @@ Notes:
 - Use `--from-query` when you want URL-style parameters.
 - `api_key=` query parameters are intentionally ignored by the installer; use `OPENROUTER_API_KEY` instead.
 - Installed launchers source `~/.config/ai-chat-shell/env` on each run.
-- Installer also writes `ai`/`aic` aliases in your shell rc to point at `~/.local/bin/...`.
+- Installer also writes `${alias}`/`${alias}c` aliases and `${alias}fix` helper in your shell rc.
 
 ### Option 3: Run from source
 
@@ -111,6 +125,15 @@ One-shot:
 
 ```bash
 python3 aichat/aichat.py "summarize this folder structure"
+```
+
+Local LM Studio/Ollama style endpoint (no API key required):
+
+```bash
+python3 aichat/aichat.py \
+  --base-url "http://127.0.0.1:11434/v1" \
+  --model "llama3.2" \
+  "summarize this folder structure"
 ```
 
 Command-only one-shot:
@@ -141,6 +164,9 @@ python3 aichat/aichat.py -c "find the 10 largest files here"
 - `--model`
 - `--alias`
 - `--base-url`
+- `--provider`
+- `--ollama`
+- `--lmstudio`
 - `--ref`
 - `--aichat-sha256`
 - `--no-auto-command`
@@ -153,6 +179,7 @@ python3 aichat/aichat.py -c "find the 10 largest files here"
 - `AI_API_KEY`: fallback API key if `OPENROUTER_API_KEY` is not set
 - `AI_MODEL`: default model (default: `google/gemini-2.5-flash-lite`)
 - `AI_BASE_URL`: API base URL (default: `https://openrouter.ai/api/v1`)
+- `AI_PROVIDER`: install-time provider preset (`openrouter`, `ollama`, `lmstudio`)
 - `AI_SYSTEM_PROMPT`: overrides default chat/command system prompts
 - `AI_TEMPERATURE`: sampling temperature
 - `AI_MAX_TOKENS`: max output tokens
@@ -162,6 +189,7 @@ python3 aichat/aichat.py -c "find the 10 largest files here"
 - `AI_FALLBACK_MODEL`: optional fallback model if primary fails
 - `OPENROUTER_HTTP_REFERER`: OpenRouter `HTTP-Referer` header value
 - `OPENROUTER_APP_NAME`: OpenRouter `X-Title` header value
+- `AI_ALLOW_NON_OPENROUTER_AUTH`: set to `1` to allow sending `Authorization` to trusted non-OpenRouter hosts (default off)
 - `AI_ALIAS`: installer default alias name
 - `AI_AICHAT_SHA256`: installer expected SHA256 for `aichat.py`
 
@@ -228,9 +256,10 @@ python3 aichat/aichat.py \
 - Review generated shell commands before execution, even when using `--exec`.
 - In command mode, malformed command responses are auto-repaired before display.
 - Installer leaves auto-exec off by default (enable only with `--auto-exec`).
-- API key auth headers are only attached for trusted hosts (`openrouter.ai`, subdomains of `openrouter.ai`, and localhost addresses).
+- API key auth headers are attached to OpenRouter hosts by default.
+- For trusted non-OpenRouter hosts (for example localhost proxies), opt in explicitly with `AI_ALLOW_NON_OPENROUTER_AUTH=1`.
 - If `--base-url` points to OpenRouter, an API key is required.
-- If `--base-url` is untrusted, the client refuses to send any provided API key.
+- If `--base-url` is non-OpenRouter and opt-in is not set, provided API keys are ignored for outbound auth.
 
 ## License
 

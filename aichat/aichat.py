@@ -19,6 +19,7 @@ DEFAULT_TIMEOUT = 60
 DEFAULT_RETRY_COUNT = 2
 DEFAULT_RETRY_BACKOFF = 1.0
 DEFAULT_COMMAND_REPAIR_ATTEMPTS = 2
+DEFAULT_LAST_COMMAND_FILE = "~/.config/ai-chat-shell/last_command"
 DEFAULT_CHAT_SYSTEM_PROMPT = (
     "You are a helpful assistant for terminal users. Be concise and practical."
 )
@@ -189,13 +190,25 @@ def is_trusted_auth_host(base_url):
     return host in TRUSTED_AUTH_HOSTS or host.endswith(".openrouter.ai")
 
 
+def allow_non_openrouter_auth():
+    return os.getenv("AI_ALLOW_NON_OPENROUTER_AUTH", "").strip().lower() in {"1", "true", "yes"}
+
+
+def should_send_auth_header(base_url):
+    if is_openrouter_host(base_url):
+        return True
+    if allow_non_openrouter_auth() and is_trusted_auth_host(base_url):
+        return True
+    return False
+
+
 def requires_api_key(base_url):
     return is_openrouter_host(base_url)
 
 
 def build_headers(base_url, api_key):
     headers = {"Content-Type": "application/json"}
-    if api_key and is_trusted_auth_host(base_url):
+    if api_key and should_send_auth_header(base_url):
         headers["Authorization"] = f"Bearer {api_key}"
     if is_openrouter_host(base_url):
         headers["HTTP-Referer"] = os.getenv("OPENROUTER_HTTP_REFERER", "https://localhost")
@@ -378,6 +391,23 @@ def classify_command_exit(command, returncode):
     return "failed", None
 
 
+def last_command_file():
+    return os.path.expanduser(os.getenv("AI_LAST_COMMAND_FILE", DEFAULT_LAST_COMMAND_FILE))
+
+
+def persist_last_command(command):
+    path = last_command_file()
+    directory = os.path.dirname(path)
+    try:
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        with open(path, "w", encoding="utf-8") as handle:
+            handle.write(f"{command}\n")
+    except OSError:
+        return False
+    return True
+
+
 def emit_model_output(args, mode, output, model_used, reason):
     if args.json:
         payload = {"mode": mode, "model": model_used, "reason": reason}
@@ -499,6 +529,7 @@ def execute_or_refine_command(args, model, messages, command):
                 print("Skipped.")
                 emit_exec_event(args, current_command, "skipped-risk", risk)
                 return
+            persist_last_command(current_command)
             completed = subprocess.run(current_command, shell=True, check=False)
             exec_status, note = classify_command_exit(current_command, completed.returncode)
             emit_exec_event(
@@ -741,12 +772,13 @@ def main():
         print("--retry-backoff must be >= 0.", file=sys.stderr)
         sys.exit(2)
 
-    if args.api_key and not is_trusted_auth_host(args.base_url):
+    if args.api_key and not should_send_auth_header(args.base_url):
         print(
-            "Refusing to send API key to an untrusted host in --base-url.",
+            "API key provided, but Authorization is disabled for this --base-url. "
+            "It will only be sent to OpenRouter hosts by default. "
+            "Set AI_ALLOW_NON_OPENROUTER_AUTH=1 to opt in for trusted non-OpenRouter hosts.",
             file=sys.stderr,
         )
-        sys.exit(2)
 
     if requires_api_key(args.base_url) and not args.api_key:
         print(
