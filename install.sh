@@ -228,6 +228,8 @@ fi
   echo 'fi'
   echo "unalias ${ALIAS_NAME} 2>/dev/null || true"
   echo "unalias ${ALIAS_NAME}c 2>/dev/null || true"
+  echo "alias ${ALIAS_NAME}=\"\$HOME/.local/bin/${ALIAS_NAME}\""
+  echo "alias ${ALIAS_NAME}c=\"\$HOME/.local/bin/${ALIAS_NAME}c\""
   echo "${END_MARK}"
 } >> "${SHELL_RC}"
 
