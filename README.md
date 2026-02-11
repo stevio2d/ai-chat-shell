@@ -67,7 +67,7 @@ curl -fsSL https://raw.githubusercontent.com/stevio2d/ai-chat-shell/main/install
   --alias "ai" \
   --ref "main" \
   --no-auto-command \
-  --auto-exec
+  --confirm-exec
 
 # Local Ollama (no API key required by default)
 curl -fsSL https://raw.githubusercontent.com/stevio2d/ai-chat-shell/main/install.sh | bash -s -- \
@@ -92,7 +92,7 @@ Query-style input:
 
 ```bash
 curl -fsSL https://raw.githubusercontent.com/stevio2d/ai-chat-shell/main/install.sh | bash -s -- \
-  --from-query "provider=ollama&model=llama3.2&alias=ai&auto_exec=1"
+  --from-query "provider=ollama&model=llama3.2&alias=ai&confirm_exec=1"
 ```
 
 Notes:
@@ -170,7 +170,8 @@ python3 aichat/aichat.py -c "find the 10 largest files here"
 - `--ref`
 - `--aichat-sha256`
 - `--no-auto-command`
-- `--auto-exec`
+- `--confirm-exec` (preferred; confirmation before execution)
+- `--auto-exec` (deprecated alias for backward compatibility)
 - `--from-query`
 
 ## Environment variables
@@ -255,7 +256,7 @@ python3 aichat/aichat.py \
 - Keep secrets in local environment variables or untracked `.env` files.
 - Review generated shell commands before execution, even when using `--exec`.
 - In command mode, malformed command responses are auto-repaired before display.
-- Installer leaves auto-exec off by default (enable only with `--auto-exec`).
+- Installer leaves execution prompts off by default (enable with `--confirm-exec`).
 - API key auth headers are attached to OpenRouter hosts by default.
 - For trusted non-OpenRouter hosts (for example localhost proxies), opt in explicitly with `AI_ALLOW_NON_OPENROUTER_AUTH=1`.
 - If `--base-url` points to OpenRouter, an API key is required.

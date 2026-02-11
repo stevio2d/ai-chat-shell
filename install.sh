@@ -43,7 +43,7 @@ usage() {
   cat <<'EOF'
 Usage:
   install.sh [--model MODEL] [--alias NAME] [--base-url URL] [--provider NAME] [--ollama] [--lmstudio]
-             [--ref REF] [--aichat-sha256 HEX] [--no-auto-command] [--auto-exec]
+             [--ref REF] [--aichat-sha256 HEX] [--no-auto-command] [--confirm-exec]
              [--from-query "model=...&alias=..."]
 
 Examples:
@@ -55,7 +55,7 @@ Examples:
     --provider "ollama" --model "llama3.2" --alias "ai"
 
   curl -fsSL https://raw.githubusercontent.com/stevio2d/ai-chat-shell/main/install.sh | bash -s -- \
-    --from-query "provider=lmstudio&model=local-model&alias=ai&auto_exec=1"
+    --from-query "provider=lmstudio&model=local-model&alias=ai&confirm_exec=1"
 EOF
 }
 
@@ -160,6 +160,7 @@ parse_query() {
       aichat_sha256) EXPECTED_AICHAT_SHA256="${value}" ;;
       auto_command) [[ "${value}" == "0" ]] && AUTO_COMMAND="0" ;;
       auto_exec) [[ "${value}" == "1" ]] && AUTO_EXEC="1" ;;
+      confirm_exec) [[ "${value}" == "1" ]] && AUTO_EXEC="1" ;;
       *) ;;
     esac
   done
@@ -205,7 +206,7 @@ while [[ $# -gt 0 ]]; do
       AUTO_COMMAND="0"
       shift
       ;;
-    --auto-exec)
+    --confirm-exec|--auto-exec)
       AUTO_EXEC="1"
       shift
       ;;
