@@ -228,8 +228,36 @@ fi
   echo 'fi'
   echo "unalias ${ALIAS_NAME} 2>/dev/null || true"
   echo "unalias ${ALIAS_NAME}c 2>/dev/null || true"
+  echo 'unset -f aifix 2>/dev/null || true'
   echo "alias ${ALIAS_NAME}=\"\$HOME/.local/bin/${ALIAS_NAME}\""
   echo "alias ${ALIAS_NAME}c=\"\$HOME/.local/bin/${ALIAS_NAME}c\""
+  echo 'aifix() {'
+  echo '  local prev_status=$?'
+  echo '  local last_cmd'
+  echo '  local note'
+  echo '  local prompt'
+  echo ''
+  echo "  last_cmd=\$(fc -ln -20 2>/dev/null | sed '/^[[:space:]]*$/d' | sed '/^[[:space:]]*\\(${ALIAS_NAME}\\|${ALIAS_NAME}c\\|aifix\\)\\>/d' | tail -n 1 | sed 's/^[[:space:]]*//')"
+  echo '  if [[ -z "$last_cmd" ]]; then'
+  echo '    echo "aifix: no previous shell command found in history." >&2'
+  echo '    return 1'
+  echo '  fi'
+  echo ''
+  echo '  if [[ $# -gt 0 ]]; then'
+  echo '    note="$*"'
+  echo '  else'
+  echo '    read -r "note?What should be fixed? "'
+  echo '  fi'
+  echo ''
+  echo '  prompt="The last shell command I ran was: $last_cmd.\n"'
+  echo '  prompt+="Its exit status was: $prev_status.\n"'
+  echo '  if [[ -n "$note" ]]; then'
+  echo '    prompt+="My note: $note\n"'
+  echo '  fi'
+  echo '  prompt+="Return exactly one corrected zsh command for macOS/Linux."'
+  echo ''
+  echo "  \"\$HOME/.local/bin/${ALIAS_NAME}c\" --exec \"\$prompt\""
+  echo '}'
   echo "${END_MARK}"
 } >> "${SHELL_RC}"
 
@@ -251,3 +279,4 @@ echo
 echo "Examples:"
 echo "  ${ALIAS_NAME} what does the ls command do"
 echo "  ${ALIAS_NAME} how to search for any string in this directory"
+echo "  aifix make that command recursive but skip node_modules"
