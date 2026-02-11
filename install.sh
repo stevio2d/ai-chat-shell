@@ -330,6 +330,7 @@ fi
   echo 'if [ -f "$HOME/.config/ai-chat-shell/env" ]; then'
   echo '  source "$HOME/.config/ai-chat-shell/env"'
   echo 'fi'
+  echo 'export AI_SHELL_HISTORY_FILE="${AI_SHELL_HISTORY_FILE:-$HOME/.zsh_history}"'
   echo "unalias ${ALIAS_NAME} 2>/dev/null || true"
   echo "unalias ${ALIAS_NAME}c 2>/dev/null || true"
   echo "unalias ${FIX_ALIAS_NAME} 2>/dev/null || true"

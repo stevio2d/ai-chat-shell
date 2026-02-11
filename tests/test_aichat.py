@@ -175,6 +175,36 @@ class AichatTests(TestCase):
             self.assertTrue(result)
             self.assertEqual(command_file.read_text(encoding="utf-8"), 'grep -r "123" .\n')
 
+    def test_persist_command_history_writes_zsh_extended_format(self):
+        with TemporaryDirectory() as temp_dir:
+            history_file = Path(temp_dir) / ".zsh_history"
+            with patch.dict(os.environ, {"AI_SHELL_HISTORY_FILE": str(history_file)}, clear=False):
+                result = aichat.persist_command_history('grep -r "blaat" .')
+            self.assertTrue(result)
+            written = history_file.read_text(encoding="utf-8")
+            self.assertIn(";grep -r \"blaat\" .\n", written)
+            self.assertRegex(written, r"^: \d+:0;")
+
+    def test_execute_or_refine_persists_last_command_and_history(self):
+        args = self.make_args()
+        messages = [{"role": "system", "content": "cmd"}]
+
+        with (
+            patch("builtins.input", side_effect=["y"]),
+            patch.object(aichat, "persist_last_command", return_value=True) as persist_last_mock,
+            patch.object(aichat, "persist_command_history", return_value=True) as persist_hist_mock,
+            patch.object(
+                aichat.subprocess,
+                "run",
+                return_value=SimpleNamespace(returncode=0),
+            ) as run_mock,
+        ):
+            aichat.execute_or_refine_command(args, "model", messages, 'grep -r "blaat" .')
+
+        run_mock.assert_called_once_with('grep -r "blaat" .', shell=True, check=False)
+        persist_last_mock.assert_called_once_with('grep -r "blaat" .')
+        persist_hist_mock.assert_called_once_with('grep -r "blaat" .')
+
     def test_build_headers_does_not_send_auth_to_localhost_by_default(self):
         with patch.dict(os.environ, {}, clear=False):
             headers = aichat.build_headers("http://127.0.0.1:11434/v1", "test-key")

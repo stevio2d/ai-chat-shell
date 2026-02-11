@@ -20,6 +20,8 @@ DEFAULT_RETRY_COUNT = 2
 DEFAULT_RETRY_BACKOFF = 1.0
 DEFAULT_COMMAND_REPAIR_ATTEMPTS = 2
 DEFAULT_LAST_COMMAND_FILE = "~/.config/ai-chat-shell/last_command"
+DEFAULT_ZSH_HISTORY_FILE = "~/.zsh_history"
+DEFAULT_BASH_HISTORY_FILE = "~/.bash_history"
 DEFAULT_CHAT_SYSTEM_PROMPT = (
     "You are a helpful assistant for terminal users. Be concise and practical."
 )
@@ -487,6 +489,38 @@ def persist_last_command(command):
     return True
 
 
+def shell_history_file():
+    configured = os.getenv("AI_SHELL_HISTORY_FILE", "").strip()
+    if configured:
+        return os.path.expanduser(configured)
+
+    histfile = os.getenv("HISTFILE", "").strip()
+    if histfile:
+        return os.path.expanduser(histfile)
+
+    shell = os.path.basename(os.getenv("SHELL", ""))
+    if shell == "zsh":
+        return os.path.expanduser(DEFAULT_ZSH_HISTORY_FILE)
+    if shell in {"bash", "sh"}:
+        return os.path.expanduser(DEFAULT_BASH_HISTORY_FILE)
+    return os.path.expanduser(DEFAULT_ZSH_HISTORY_FILE)
+
+
+def persist_command_history(command):
+    path = shell_history_file()
+    directory = os.path.dirname(path)
+    try:
+        if directory:
+            os.makedirs(directory, exist_ok=True)
+        is_zsh = os.path.basename(path).endswith("zsh_history")
+        line = f": {int(time.time())}:0;{command}\n" if is_zsh else f"{command}\n"
+        with open(path, "a", encoding="utf-8") as handle:
+            handle.write(line)
+    except OSError:
+        return False
+    return True
+
+
 def emit_model_output(args, mode, output, model_used, reason):
     if args.json:
         payload = {"mode": mode, "model": model_used, "reason": reason}
@@ -609,6 +643,7 @@ def execute_or_refine_command(args, model, messages, command):
                 emit_exec_event(args, current_command, "skipped-risk", risk)
                 return
             persist_last_command(current_command)
+            persist_command_history(current_command)
             completed = subprocess.run(current_command, shell=True, check=False)
             exec_status, note = classify_command_exit(current_command, completed.returncode)
             emit_exec_event(
