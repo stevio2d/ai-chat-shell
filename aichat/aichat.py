@@ -46,7 +46,7 @@ RISK_PATTERNS = (
     (r"(?:^|[;&|])\s*:\(\)\s*\{", "fork-bomb-pattern", "high"),
     (r">\s*/(etc|usr|bin|sbin|var)\b", "system-file-write", "high"),
 )
-SECRET_PATTERNS = (r"sk-or-v1-[A-Za-z0-9]{6,}",)
+SECRET_PATTERNS = (r"sk-or-v1-[A-Za-z0-9]+",)
 SECRET_ASSIGNMENT_PATTERNS = (
     r"\bOPENROUTER_API_KEY\s*=\s*['\"]?([A-Za-z0-9._-]{12,})",
     r"\bAI_API_KEY\s*=\s*['\"]?([A-Za-z0-9._-]{12,})",
@@ -323,6 +323,38 @@ def normalize_command_output(text):
     return command
 
 
+def command_primary_executable(command):
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        parts = command.strip().split()
+
+    assignment = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=.*$")
+    for part in parts:
+        if assignment.match(part):
+            continue
+        if part == "env":
+            continue
+        return os.path.basename(part)
+    return ""
+
+
+def expected_primary_from_fix_prompt(messages):
+    marker = "The last shell command I ran was:"
+    for entry in reversed(messages):
+        if entry.get("role") != "user":
+            continue
+        content = entry.get("content", "")
+        if marker not in content:
+            continue
+        match = re.search(r"The last shell command I ran was:\s*(.+?)(?:\\n|\n|$)", content, re.DOTALL)
+        if not match:
+            continue
+        previous_command = match.group(1).strip()
+        return command_primary_executable(previous_command)
+    return ""
+
+
 def is_secret_like_assignment_value(value):
     candidate = value.strip("'\"").strip()
     if len(candidate) < 20:
@@ -363,8 +395,13 @@ def validate_command_output(command):
 
 def enforce_command_quality(args, model, messages, output):
     candidate = normalize_command_output(output)
+    expected_primary = expected_primary_from_fix_prompt(messages)
     for attempt in range(DEFAULT_COMMAND_REPAIR_ATTEMPTS + 1):
         issues = validate_command_output(candidate)
+        if expected_primary:
+            candidate_primary = command_primary_executable(candidate)
+            if candidate_primary and candidate_primary != expected_primary:
+                issues.append(f"changes primary executable (expected {expected_primary})")
         if not issues:
             return candidate
         if attempt >= DEFAULT_COMMAND_REPAIR_ATTEMPTS:
@@ -379,6 +416,11 @@ def enforce_command_quality(args, model, messages, output):
             repair_request += (
                 " Do not include API keys, token-like strings, or OPENROUTER_API_KEY/AI_API_KEY "
                 "assignments."
+            )
+        if expected_primary:
+            repair_request += (
+                f" Keep the primary executable as '{expected_primary}' unless the user explicitly "
+                "asked to change tools."
             )
         repair_messages = messages + [
             {"role": "assistant", "content": candidate},

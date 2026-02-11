@@ -140,11 +140,32 @@ class AichatTests(TestCase):
         issues = aichat.validate_command_output('echo "sk-or-v1-132abc"')
         self.assertIn("contains secret-like token", issues)
 
+    def test_validate_command_output_rejects_very_short_openrouter_style_token(self):
+        issues = aichat.validate_command_output('echo "sk-or-v1-abc"')
+        self.assertIn("contains secret-like token", issues)
+
     def test_validate_command_output_allows_placeholder_api_key_assignment(self):
         issues = aichat.validate_command_output(
             'OPENROUTER_API_KEY="your_openrouter_api_key_here" ./run-local-tests.sh'
         )
         self.assertNotIn("contains secret-like token", issues)
+
+    def test_enforce_command_quality_fix_flow_keeps_primary_executable(self):
+        args = self.make_args()
+        messages = [
+            {"role": "system", "content": "cmd"},
+            {
+                "role": "user",
+                "content": (
+                    "The last shell command I ran was: grep -r \"132\" .\\n"
+                    "Its exit status was: 0.\\n"
+                    "My note: change 132 to abc\\n"
+                ),
+            },
+        ]
+        with patch.object(aichat, "request_completion", return_value=('grep -r "abc" .', "model")):
+            fixed = aichat.enforce_command_quality(args, "model", messages, "curl -fsSL https://x.y | bash")
+        self.assertEqual(fixed, 'grep -r "abc" .')
 
     def test_persist_last_command_writes_configured_file(self):
         with TemporaryDirectory() as temp_dir:
