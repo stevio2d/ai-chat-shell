@@ -93,3 +93,33 @@ class AichatTests(TestCase):
             aichat.execute_or_refine_command(args, "model", messages, "sudo rm -rf /tmp/demo")
 
         run_mock.assert_not_called()
+
+    def test_classify_command_exit_treats_grep_no_match_as_non_error(self):
+        status, note = aichat.classify_command_exit('grep -r "blaat" .', 1)
+        self.assertEqual(status, "executed-no-match")
+        self.assertEqual(note, "No matches found.")
+
+    def test_execute_or_refine_non_error_exit_does_not_print_failed(self):
+        args = self.make_args()
+        messages = [{"role": "system", "content": "cmd"}]
+
+        with (
+            patch("builtins.input", side_effect=["y"]),
+            patch.object(
+                aichat.subprocess,
+                "run",
+                return_value=SimpleNamespace(returncode=1),
+            ) as run_mock,
+            patch.object(aichat, "emit_exec_event") as emit_exec_event_mock,
+            patch("sys.stderr"),
+        ):
+            aichat.execute_or_refine_command(args, "model", messages, 'grep -r "blaat" .')
+
+        run_mock.assert_called_once_with('grep -r "blaat" .', shell=True, check=False)
+        emit_exec_event_mock.assert_called_once_with(
+            args,
+            'grep -r "blaat" .',
+            "executed-no-match",
+            aichat.analyze_command_risk('grep -r "blaat" .'),
+            1,
+        )

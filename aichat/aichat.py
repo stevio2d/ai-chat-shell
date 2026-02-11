@@ -4,6 +4,7 @@ import argparse
 import json
 import os
 import re
+import shlex
 import subprocess
 import sys
 import time
@@ -345,6 +346,29 @@ def analyze_command_risk(command):
     }
 
 
+def classify_command_exit(command, returncode):
+    if returncode == 0:
+        return "executed", None
+
+    try:
+        parts = shlex.split(command)
+    except ValueError:
+        parts = command.strip().split()
+
+    if not parts:
+        return "failed", None
+
+    base = os.path.basename(parts[0])
+    non_error_one = {"grep", "egrep", "fgrep", "rg", "ripgrep", "diff", "cmp"}
+    if returncode == 1 and base in non_error_one:
+        if base in {"grep", "egrep", "fgrep", "rg", "ripgrep"}:
+            return "executed-no-match", "No matches found."
+        if base in {"diff", "cmp"}:
+            return "executed-different", "Inputs differ."
+
+    return "failed", None
+
+
 def emit_model_output(args, mode, output, model_used, reason):
     if args.json:
         payload = {"mode": mode, "model": model_used, "reason": reason}
@@ -467,14 +491,17 @@ def execute_or_refine_command(args, model, messages, command):
                 emit_exec_event(args, current_command, "skipped-risk", risk)
                 return
             completed = subprocess.run(current_command, shell=True, check=False)
+            exec_status, note = classify_command_exit(current_command, completed.returncode)
             emit_exec_event(
                 args,
                 current_command,
-                "executed" if completed.returncode == 0 else "failed",
+                exec_status,
                 risk,
                 completed.returncode,
             )
-            if completed.returncode != 0:
+            if note:
+                print(note, file=sys.stderr)
+            if exec_status == "failed":
                 print(f"Command exited with code {completed.returncode}.", file=sys.stderr)
             return
 
