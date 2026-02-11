@@ -45,6 +45,11 @@ RISK_PATTERNS = (
     (r"(?:^|[;&|])\s*:\(\)\s*\{", "fork-bomb-pattern", "high"),
     (r">\s*/(etc|usr|bin|sbin|var)\b", "system-file-write", "high"),
 )
+SECRET_PATTERNS = (
+    r"sk-or-v1-[A-Za-z0-9]{20,}",
+    r"\bOPENROUTER_API_KEY\s*=\s*['\"]?[A-Za-z0-9._-]{20,}",
+    r"\bAI_API_KEY\s*=\s*['\"]?[A-Za-z0-9._-]{20,}",
+)
 
 
 def env_float(name):
@@ -304,6 +309,10 @@ def validate_command_output(command):
     lowered = command.lower()
     if lowered.startswith(("run ", "use ", "here is ", "this command ", "you can ")):
         issues.append("contains explanatory text")
+    for pattern in SECRET_PATTERNS:
+        if re.search(pattern, command):
+            issues.append("contains secret-like token")
+            break
     return issues
 
 

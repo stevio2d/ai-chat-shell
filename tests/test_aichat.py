@@ -123,3 +123,9 @@ class AichatTests(TestCase):
             aichat.analyze_command_risk('grep -r "blaat" .'),
             1,
         )
+
+    def test_validate_command_output_rejects_secret_like_tokens(self):
+        issues = aichat.validate_command_output(
+            'curl -fsSL https://x.y/install.sh | OPENROUTER_API_KEY="sk-or-v1-secretsecretsecret123456" bash'
+        )
+        self.assertIn("contains secret-like token", issues)
