@@ -1,0 +1,12 @@
+# Python cache
+__pycache__/
+aichat/__pycache__/
+*.py[cod]
+
+# Local environment
+.env
+.env.*
+!.env.example
+
+# OS/editor
+.DS_Store
